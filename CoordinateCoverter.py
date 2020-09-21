@@ -3,7 +3,8 @@ from collections import namedtuple
 import xlrd
 import tkinter as tk
 import tkinter.filedialog
-
+import logging
+import logging.config
 
 
 class CoordinateConverter(tk.Frame):
@@ -12,6 +13,9 @@ class CoordinateConverter(tk.Frame):
         self.master = master
         self.pack()
         self.create_widgets()
+        logging.config.fileConfig('logging.conf')
+        self.logger = logging.getLogger(self.__class__.__name__)
+        
 
     def create_widgets(self):
         self.coor = tkinter.StringVar()
@@ -36,9 +40,11 @@ class CoordinateConverter(tk.Frame):
 
     def select_Coordinate(self):
         self.coor.set(tkinter.filedialog.askopenfilename(filetypes = (("coordinate files","*.txt"),("all files","*.*"))))
+        self.logger.info("Coordinate file '{0}' selected!".format(self.coor.get()))
 
     def select_bom(self):
-        self.bom.set(tkinter.filedialog.askopenfilename(filetypes = (("Bom files","*.xls;*.xls;*.xlsx;*.xlsm"),("all files","*.*"))))        
+        self.bom.set(tkinter.filedialog.askopenfilename(filetypes = (("Bom files","*.xls;*.xls;*.xlsx;*.xlsm"),("all files","*.*"))))  
+        self.logger.info("BOM file '{0}' selected!".format(self.bom.get()))      
 
 
     def gen_essemtec(self):
@@ -73,19 +79,26 @@ class CoordinateConverter(tk.Frame):
             for comp in pos.split(","):
                 comp = comp.strip()
                 bom_dict[comp] = BomExt(comp,  str(int(SchId)) if SchId != "" else "", SchDesc, Quatity, Remark, SupplierId)
+                if SchId == "":
+                    self.logger.warning("Componenet '{0}' don't have a Schindler ID!".format(comp))
 
         with open(self.coor.get()+"_bottom.txt", "w") as bottom:
             for bot in bottom_list:
                 if bot.refdes in bom_dict:
-                    bottom.write(",".join([bot.refdes, bom_dict[bot.refdes].SchId, bot.refx, bot.refy, "{:03}".format(int(float(bot.rotation))), bot.footprint]))
+                    bottom.write(",".join([bot.refdes, bom_dict[bot.refdes].SchId, bot.midx.strip("m"), bot.midy.strip("m"), "{:03}".format(int(float(bot.rotation))), bot.footprint]))
                     bottom.write("\r")
+                else:
+                    self.logger.warning("Componenet '{0}' in Coordinate file but not in BOM!".format(bot.refdes))
 
         with open(self.coor.get()+"_top.txt", "w") as top:
             for bot in top_list:
                 if bot.refdes in bom_dict:
-                    top.write(",".join([bot.refdes, bom_dict[bot.refdes].SchId, bot.refx, bot.refy, "{:03}".format(int(float(bot.rotation))), bot.footprint]))
+                    top.write(",".join([bot.refdes, bom_dict[bot.refdes].SchId, bot.midx.strip("m"), bot.midy.strip("m"), "{:03}".format(int(float(bot.rotation))), bot.footprint]))
                     top.write("\r")
+                else:
+                    self.logger.warning("Componenet '{0}' in Coordinate file but not in BOM!".format(bot.refdes))
 
 root = tk.Tk()
+root.title("Coordinate File Converter")
 app = CoordinateConverter(master=root)
 app.mainloop()
